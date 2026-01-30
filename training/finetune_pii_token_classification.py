@@ -147,7 +147,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--num_train_epochs", type=float, default=3.0)
     p.add_argument("--learning_rate", type=float, default=5e-5)
     p.add_argument("--weight_decay", type=float, default=0.01)
-    p.add_argument("--warmup_ratio", type=float, default=0.1)
+    p.add_argument("--warmup_steps", type=float, default=0.1, help="Warmup steps (int) or ratio (float < 1).")
 
     p.add_argument("--per_device_train_batch_size", type=int, default=8)
     p.add_argument("--per_device_eval_batch_size", type=int, default=8)
@@ -550,7 +550,7 @@ def main() -> None:
         save_total_limit=args.save_total_limit,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
-        warmup_ratio=args.warmup_ratio,
+        warmup_steps=args.warmup_steps,
         num_train_epochs=args.num_train_epochs,
         max_steps=args.max_steps,
         per_device_train_batch_size=args.per_device_train_batch_size,
