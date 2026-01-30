@@ -389,7 +389,6 @@ def main() -> None:
     from datasets import load_dataset
     import torch
     from transformers import (
-        AutoModelForTokenClassification,
         AutoTokenizer,
         DataCollatorForTokenClassification,
         Trainer,
@@ -495,14 +494,68 @@ def main() -> None:
 
     collator = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
-    model = AutoModelForTokenClassification.from_pretrained(
+    # Some older BERT checkpoints (e.g. neuralmind/bert-base-portuguese-cased) use
+    # TensorFlow-style LayerNorm parameter names (gamma/beta) instead of PyTorch (weight/bias).
+    # We rename these keys to avoid "missing keys" / "unexpected keys" warnings.
+    def _rename_layernorm_keys(state_dict: dict) -> dict:
+        renamed = {}
+        for k, v in state_dict.items():
+            new_key = k
+            if ".LayerNorm.gamma" in k:
+                new_key = k.replace(".LayerNorm.gamma", ".LayerNorm.weight")
+            elif ".LayerNorm.beta" in k:
+                new_key = k.replace(".LayerNorm.beta", ".LayerNorm.bias")
+            renamed[new_key] = v
+        return renamed
+
+    from transformers import AutoConfig, BertForTokenClassification
+    from huggingface_hub import hf_hub_download
+    from safetensors.torch import load_file as load_safetensors
+
+    config = AutoConfig.from_pretrained(
         args.model_name_or_path,
         num_labels=len(label_list),
         id2label=id2label,
         label2id=label2id,
-        ignore_mismatched_sizes=True,
-        use_safetensors=True,
     )
+    model = BertForTokenClassification(config)
+
+    # Load pretrained weights (safetensors or pytorch_model.bin)
+    try:
+        weights_path = hf_hub_download(args.model_name_or_path, "model.safetensors")
+        state_dict = load_safetensors(weights_path)
+    except Exception:
+        try:
+            weights_path = hf_hub_download(args.model_name_or_path, "pytorch_model.bin")
+            state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
+        except Exception:
+            # Fallback: local path
+            local_safetensors = Path(args.model_name_or_path) / "model.safetensors"
+            local_bin = Path(args.model_name_or_path) / "pytorch_model.bin"
+            if local_safetensors.exists():
+                state_dict = load_safetensors(str(local_safetensors))
+            elif local_bin.exists():
+                state_dict = torch.load(str(local_bin), map_location="cpu", weights_only=True)
+            else:
+                raise FileNotFoundError(
+                    f"Could not find model weights at {args.model_name_or_path}"
+                )
+
+    state_dict = _rename_layernorm_keys(state_dict)
+
+    # Filter out pooler and prediction head keys (not used for token classification)
+    # and only load compatible weights
+    model_keys = set(model.state_dict().keys())
+    filtered_state_dict = {k: v for k, v in state_dict.items() if k in model_keys}
+
+    # Load weights (classifier head will be randomly initialized)
+    missing, unexpected = model.load_state_dict(filtered_state_dict, strict=False)
+    if missing:
+        # Only classifier.weight and classifier.bias should be missing (expected for new head)
+        expected_missing = {"classifier.weight", "classifier.bias"}
+        actual_missing = set(missing)
+        if actual_missing != expected_missing:
+            print(f"Warning: unexpected missing keys: {actual_missing - expected_missing}")
 
     o_id = label2id["O"]
 
