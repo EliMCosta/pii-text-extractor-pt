@@ -1,22 +1,22 @@
 #
 # Core
 #
-httpx==0.27.2
-tqdm==4.66.4
+httpx>=0.27.2
+tqdm>=4.66.4
 numpy
 
 #
 # Training / Hugging Face
 #
-accelerate==1.12.0
-datasets==4.5.0
+accelerate>=1.12.0
+datasets>=4.5.0
 huggingface_hub
-transformers==4.57.6
+transformers>=4.47.0
 torch
 zstandard
 
 #
-# Datasets
+# Datasets (Hugging Face Hub)
 #
-xet
-lfs
+hf_xet
+huggingface_hub[hf_xet]
