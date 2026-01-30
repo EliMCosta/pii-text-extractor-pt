@@ -405,9 +405,9 @@ def main() -> None:
         raise RuntimeError(
             "Detected multiple GPUs, but the script is running with WORLD_SIZE=1.\n"
             "To use all GPUs, launch with one process per GPU, e.g.:\n"
-            "  torchrun --standalone --nproc_per_node=2 training/finetune_pii_token_classification.py --bf16\n"
+            "  torchrun --standalone --nproc_per_node=2 training/finetune_pii_token_classification.py\n"
             "or:\n"
-            "  accelerate launch --num_processes 2 training/finetune_pii_token_classification.py --bf16\n"
+            "  accelerate launch --num_processes 2 training/finetune_pii_token_classification.py\n"
             "\n"
             "If you intentionally want to use a single GPU, set CUDA_VISIBLE_DEVICES=0 (or another single id)."
         )
@@ -501,6 +501,7 @@ def main() -> None:
         id2label=id2label,
         label2id=label2id,
         ignore_mismatched_sizes=True,
+        use_safetensors=True,
     )
 
     o_id = label2id["O"]
