@@ -152,7 +152,7 @@ def _infer_one_text(
     min_span_tokens: int,
     min_span_tokens_by_type: dict[str, int],
     resolve_overlaps: bool,
-) -> list[PiiSpan]:
+) -> list[PiiSpanScored]:
     import torch
 
     chunks = build_chunks(
@@ -310,8 +310,7 @@ def _infer_one_text(
         all_spans_scored = spans_scored
 
     merged = merge_and_resolve_scored_spans(all_spans_scored, resolve_overlaps=resolve_overlaps)
-    merged_plain = [PiiSpan(start=s.start, end=s.end, pii_type=s.pii_type) for s in merged]
-    return merged_plain
+    return merged
 
 
 def _parse_args() -> argparse.Namespace:
@@ -551,7 +550,7 @@ def _cmd_infer(args: argparse.Namespace) -> int:
     if text_sources != 1:
         raise ValueError("Provide exactly one input source: --text or --text_file or --jsonl_in")
 
-    def _format_out(*, text: str, spans: list[PiiSpan]) -> dict[str, Any]:
+    def _format_out(*, text: str, spans: list[PiiSpanScored]) -> dict[str, Any]:
         pii_types = set(PII_TYPES)
         should_be_public = not any(s.pii_type in pii_types for s in spans)
         return {
@@ -562,6 +561,7 @@ def _cmd_infer(args: argparse.Namespace) -> int:
                     "start": s.start,
                     "end": s.end,
                     "value": text[s.start : s.end],
+                    "conf": round(s.confidence, 2),
                 }
                 for s in spans
             ],
@@ -668,7 +668,7 @@ def _cmd_infer(args: argparse.Namespace) -> int:
             )
             rec = dict(obj)
             rec["spans"] = [
-                {"type": s.pii_type, "start": s.start, "end": s.end, "value": text[s.start : s.end]}
+                {"type": s.pii_type, "start": s.start, "end": s.end, "value": text[s.start : s.end], "conf": round(s.confidence, 2)}
                 for s in spans
             ]
             rec["should_be_public"] = not any(s.pii_type in pii_types for s in spans)
