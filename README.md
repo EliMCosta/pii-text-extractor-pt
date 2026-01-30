@@ -1,5 +1,7 @@
 # PII Text Extractor (Extrator de Dados Pessoais)
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/EliMCosta/pii-text-extractor-pt/blob/main/notebooks/pii_extractor_colab.ipynb)
+
 Este projeto utiliza **modelos de linguagem (NLP)** para identificar automaticamente pedidos de acesso à informação que contenham **dados pessoais** (PII - Personally Identifiable Information) em requerimentos de e-SIC/LAI. A ferramenta extrai entidades sensíveis e classifica se o texto pode ou não ser tornado público, garantindo que a informação circule sob o princípio do *need-to-know* (necessidade de saber).
 
 ### Interface e Expectativas de Dados
