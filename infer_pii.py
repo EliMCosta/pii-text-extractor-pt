@@ -206,20 +206,26 @@ def _infer_one_text(
                 offs = [(int(a), int(b)) for (a, b) in offs_i]
                 em = logits_np[bi]  # (T,C)
 
+                # Estratégia: Agregação de Logits
+                # Se habilitado, acumulamos os logits de cada token usando seus offsets globais
+                # para calcular a média posteriormente. Isso reduz ruído em zonas de sobreposição.
                 if aggregate_n == "mean_logits":
                     am = attn_cpu[bi] if attn_cpu is not None else None
                     for ti, (a, b) in enumerate(offs):
-                        # Skip special tokens and padding.
+                        # Pula tokens especiais (CLS/SEP) e preenchimento (padding)
                         if a == 0 and b == 0:
                             continue
                         if am is not None and int(am[ti]) == 0:
                             continue
+                        
+                        # Calcula a posição absoluta (global) do token no texto original
                         ga = int(a) + int(ch.char_start)
                         gb = int(b) + int(ch.char_start)
                         if ga >= gb:
                             continue
                         k = (ga, gb)
                         v = em[ti].astype(np.float32, copy=False)
+                        
                         if k in token_logits_sum:
                             token_logits_sum[k] = token_logits_sum[k] + v
                             token_logits_count[k] = int(token_logits_count[k]) + 1
@@ -228,10 +234,12 @@ def _infer_one_text(
                             token_logits_count[k] = 1
                     continue
 
+                # Estratégia: BIO Viterbi Decoding
+                # Aplica o algoritmo de Viterbi com uma matriz de transição que respeita
+                # as regras do esquema BIO (ex: I-XXX deve seguir B-XXX ou I-XXX).
                 if decode_n == "bio_viterbi":
                     force_o = np.array([(a == 0 and b == 0) for (a, b) in offs], dtype=bool)
                     if attn_cpu is not None:
-                        # Padding tokens: attention_mask == 0
                         am = np.array([int(x) for x in attn_cpu[bi]], dtype=np.int32)
                         force_o = np.logical_or(force_o, am == 0)
                     pred_ids = viterbi_decode_bio(

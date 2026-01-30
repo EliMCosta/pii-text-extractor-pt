@@ -4,6 +4,8 @@
 
 Este projeto utiliza **modelos de linguagem (NLP)** para identificar automaticamente pedidos de acesso à informação que contenham **dados pessoais** (PII - Personally Identifiable Information) em requerimentos de e-SIC/LAI. A ferramenta extrai entidades sensíveis e classifica se o texto pode ou não ser tornado público, garantindo que a informação circule sob o princípio do *need-to-know* (necessidade de saber).
 
+![PII Text Extractor](pii_text_extractor.png)
+
 ### Interface e Expectativas de Dados
 
 - **Entrada**: Texto bruto (strings) ou arquivos JSONL (campo `text`) contendo requerimentos administrativos, manifestações de ouvidoria ou qualquer texto em linguagem natural. Graças ao **Smart Chunking**, o sistema lida nativamente com textos de qualquer extensão (desde frases curtas até documentos de várias páginas).
@@ -376,7 +378,7 @@ O projeto implementa técnicas avançadas de inferência que rodam puramente com
 ## 7. Notas Técnicas
 
 - **Smart Chunking**: A estratégia de fragmentação de texto é "PII-agnostic" (não precisa saber onde estão os dados antes de quebrar o texto), mas é semanticamente consciente, preferindo quebras em fins de frase e evitando cortes no meio de palavras. Isso melhora a precisão do modelo ao preservar o contexto local.
-- **Fail-fast**: O script de fine-tuning verifica a versão da biblioteca `accelerate` antes de iniciar o processamento pesado, garantindo que o ambiente está configurado corretamente.
+- **Uso de IA**: Este projeto utilizou IA generativa (Gemini 3, GPT 5.2, Claude Opus 4.5), por meio de plataformas diversas, para geração de código e datasets.
 
 ## Refs.:
 
@@ -389,3 +391,30 @@ https://about.roblox.com/newsroom/2025/11/open-sourcing-roblox-pii-classifier-ai
 https://github.com/Geotrend-research/smaller-transformers
 
 https://www.protecto.ai/blog/best-ner-models-for-pii-identification/
+
+---
+
+## Disclaimer e Licenças de Dependências
+
+Este projeto é distribuído sob a licença Apache-2.0. Consulte o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+### Principais Dependências e suas Licenças
+
+| Dependência | Licença | Uso no Projeto |
+|-------------|---------|----------------|
+| [PyTorch](https://pytorch.org/) | BSD-3-Clause | Framework de deep learning |
+| [Transformers](https://huggingface.co/docs/transformers) | Apache-2.0 | Pipeline de NLP e tokenização |
+| [Datasets](https://huggingface.co/docs/datasets) | Apache-2.0 | Carregamento e processamento de datasets |
+| [Accelerate](https://huggingface.co/docs/accelerate) | Apache-2.0 | Treinamento distribuído |
+| [NumPy](https://numpy.org/) | BSD-3-Clause | Operações numéricas e pós-processamento |
+| [BERTimbau](https://huggingface.co/neuralmind/bert-base-portuguese-cased) | MIT | Modelo base pré-treinado para português |
+
+### Aviso de Responsabilidade
+
+1. **Uso do Modelo**: Este projeto é fornecido "como está", sem garantias de qualquer tipo. Os resultados de extração de PII devem ser validados por humanos antes de uso em ambientes de produção críticos.
+
+2. **Dados Sensíveis**: O modelo foi treinado para identificar dados pessoais, mas pode apresentar falsos positivos ou negativos. A responsabilidade pela conformidade com a LGPD e outras regulamentações de proteção de dados permanece com o usuário final.
+
+3. **Modelos de Terceiros**: O modelo base (`neuralmind/bert-base-portuguese-cased`) é desenvolvido e mantido pela NeuralMind.
+
+4. **Dataset**: O dataset [EliMC/esic-ner](https://huggingface.co/datasets/EliMC/esic-ner) pode conter dados sintéticos ou anonimizados sob licença Creative Commons Attribution 4.0.
