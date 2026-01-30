@@ -1,6 +1,17 @@
-# PII Text Identifier (Identificador de Dados Pessoais)
+# PII Text Extractor (Extrator de Dados Pessoais)
 
-Este projeto utiliza **modelos de linguagem (NLP)** para identificar automaticamente pedidos de acesso à informação que contenham **dados pessoais** (PII - Personally Identifiable Information) em requerimentos de e-SIC/LAI, permitindo que órgãos públicos implementem fluxos de trabalho e camadas de proteção de dados eficientes, garantindo que a informação circule sob o princípio do *need-to-know* (necessidade de saber).
+Este projeto utiliza **modelos de linguagem (NLP)** para identificar automaticamente pedidos de acesso à informação que contenham **dados pessoais** (PII - Personally Identifiable Information) em requerimentos de e-SIC/LAI. A ferramenta extrai entidades sensíveis e classifica se o texto pode ou não ser tornado público, garantindo que a informação circule sob o princípio do *need-to-know* (necessidade de saber).
+
+### Interface e Expectativas de Dados
+
+- **Entrada**: Texto bruto (strings) ou arquivos JSONL (campo `text`) contendo requerimentos administrativos, manifestações de ouvidoria ou qualquer texto em linguagem natural. Graças ao **Smart Chunking**, o sistema lida nativamente com textos de qualquer extensão (desde frases curtas até documentos de várias páginas).
+- **Saída**: Estrutura JSON padronizada contendo:
+  - `spans`: Lista de entidades detectadas, incluindo o tipo (ex: `DOC_PESSOAL`, `NOME_PESSOA`), índices de início/fim, valor literal e confiança da predição.
+  - `should_be_public`: Booleano calculado automaticamente. É `false` se qualquer PII for detectada e `true` caso o texto contenha apenas informações impessoais (ou entidades não-sensíveis como nomes de órgãos públicos).
+
+---
+
+Tecnicamente, a solução consiste em um modelo **BERT** (`neuralmind/bert-base-portuguese-cased`) com treinamento de ajuste para a tarefa de **Named Entity Recognition (NER)** via **Token Classification**. O pipeline inclui uma etapa de **Smart Chunking** que fragmenta textos longos respeitando fronteiras de palavras e sentenças, e técnicas de pós-processamento para garantir sequências válidas. Todo o pós-processamento é baseado em NumPy, mantendo compatibilidade com exportação **ONNX/TensorRT** para implantação em produção.
 
 
 ## Motivação/Problema
@@ -52,7 +63,7 @@ Cada linha do dataset contém:
 
 O dataset pode ser baixado diretamente via Hugging Face Datasets:
 
-```python
+```bash
 mkdir data && cd data
 git clone https://huggingface.co/datasets/EliMC/esic-ner && cd ..
 ```
@@ -189,6 +200,18 @@ python infer_pii.py \
     --text "O CPF do solicitante João Silva é 123.456.789-00."
 ```
 
+Output esperado:
+```json
+{
+  "text": "O CPF do solicitante João Silva é 123.456.789-00.",
+  "spans": [
+    {"type": "NOME_PESSOA", "start": 21, "end": 31, "value": "João Silva", "conf": 0.99},
+    {"type": "DOC_PESSOAL", "start": 34, "end": 48, "value": "123.456.789-00", "conf": 0.99}
+  ],
+  "should_be_public": false
+}
+```
+
 **2. Inferência com alta precisão (threshold de confiança):**
 Útil para evitar falsos positivos em produção.
 ```bash
@@ -197,6 +220,17 @@ python infer_pii.py \
     infer \
     --text "Encaminho o processo SEI 001.002.003/2024." \
     --span_conf_threshold 0.85
+```
+
+Output esperado:
+```json
+{
+  "text": "Encaminho o processo SEI 001.002.003/2024.",
+  "spans": [
+    {"type": "ID_PROCESSUAL", "start": 25, "end": 41, "value": "001.002.003/2024", "conf": 0.92}
+  ],
+  "should_be_public": false
+}
 ```
 
 **3. Inferência com thresholds por tipo de entidade:**
@@ -209,6 +243,8 @@ python infer_pii.py \
     --jsonl_out output.jsonl \
     --span_conf_threshold_by_type '{"NOME_PESSOA": 0.9, "DOC_PESSOAL": 0.5}'
 ```
+
+*(O arquivo `output.jsonl` conterá uma linha JSON similar ao exemplo 1 para cada entrada)*
 
 **4. Inferência em textos longos com agregação de sobreposição:**
 Garante que entidades na fronteira entre chunks sejam detectadas corretamente.
@@ -252,6 +288,15 @@ python infer_pii.py \
     eval \
     --dataset_path data/esic-ner/test.jsonl \
     --report_path outputs/eval_report_v1.md
+```
+
+Output esperado (stdout):
+```json
+{
+  "pii_token_level": {"precision": 0.96, "recall": 0.94, "f1": 0.95, ...},
+  "pii_binary": {"precision": 0.98, "recall": 0.97, "f1": 0.97, "accuracy": 0.97, ...},
+  "report_path": "outputs/eval_report_v1.md"
+}
 ```
 
 **2. Avaliação rápida (apenas primeiras N linhas):**
@@ -298,19 +343,6 @@ O projeto implementa técnicas avançadas de inferência que rodam puramente com
 1.  **Viterbi Constrained Decoding**: Ao usar `--decode bio_viterbi`, o script utiliza o algoritmo de Viterbi com uma matriz de transição que proíbe sequências impossíveis, melhorando a consistência dos spans.
 2.  **Logit Aggregation**: Com `--aggregate_overlaps mean_logits`, o modelo calcula a média das probabilidades de cada token que aparece em múltiplos chunks sobrepostos antes de tomar a decisão final, reduzindo ruído em fronteiras de chunk.
 3.  **Filtragem por Confiança e Tamanho**: Permite descartar predições "fracas" ou muito curtas, ajudando a equilibrar Precision e Recall sem necessidade de retreinar o encoder.
-
-### Entendendo o Relatório de Avaliação (`eval_report.md`)
-
-O script de avaliação gera um relatório detalhado para análise de erros. Abaixo estão os conceitos principais utilizados:
-
-- **`gold_public`**: Indica se o documento é **realmente público** segundo o dataset (True = Público/Sem PII, False = Privado/Com PII).
-- **`pred_public`**: Indica se o modelo **previu** que o documento é público (True = Previu Público, False = Previu Privado).
-- **`pii_bucket`**: Classificação binária do documento (nível de documento):
-    - `tp` (True Positive): O documento tem PII e o modelo identificou.
-    - `tn` (True Negative): O documento é público e o modelo confirmou.
-    - `fp` (False Positive): O documento é público, mas o modelo achou PII (over-redaction).
-    - `fn` (False Negative): O documento tem PII, mas o modelo não detectou (vazamento de dados).
-- **`pii_token_error`**: Indica se houve erro no **nível de token** (NER). Mesmo que o modelo acerte se o documento é privado, ele pode errar o início/fim exato de um nome ou confundir tipos de PII.
 
 ---
 
