@@ -590,6 +590,19 @@ def main() -> None:
     if best_dir == "auto":
         best_dir = str(Path(args.output_dir) / "best")
 
+    # Compute actual warmup_steps: if < 1, treat as ratio of total training steps.
+    if args.warmup_steps < 1.0:
+        steps_per_epoch = len(train_ds) // (
+            args.per_device_train_batch_size * args.gradient_accumulation_steps
+        )
+        if args.max_steps > 0:
+            total_steps = args.max_steps
+        else:
+            total_steps = int(steps_per_epoch * args.num_train_epochs)
+        warmup_steps = int(args.warmup_steps * total_steps)
+    else:
+        warmup_steps = int(args.warmup_steps)
+
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         do_train=True,
@@ -603,7 +616,7 @@ def main() -> None:
         save_total_limit=args.save_total_limit,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
-        warmup_steps=args.warmup_steps,
+        warmup_steps=warmup_steps,
         num_train_epochs=args.num_train_epochs,
         max_steps=args.max_steps,
         per_device_train_batch_size=args.per_device_train_batch_size,
