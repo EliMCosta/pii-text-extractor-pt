@@ -153,8 +153,7 @@ O modelo é especializado na tarefa de extração de **entidades** (NER). O scri
 
 ```bash
 # Single GPU
-CUDA_VISIBLE_DEVICES=0 accelerate launch --num_processes 1 \
-    training/finetune_pii_token_classification.py \
+CUDA_VISIBLE_DEVICES=0 python training/finetune_pii_token_classification.py \
     --model_name_or_path neuralmind/bert-base-portuguese-cased \
     --dataset_path data/esic-ner/train_chunks.jsonl \
     --output_dir outputs/pii-textx-pt \
